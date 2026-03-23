@@ -264,43 +264,32 @@ class Api:
             min_id = str(date_to_bound(start_date, "start"))
         if end_date is not None:
             max_id = str(date_to_bound(end_date, "end"))
-        assert min_id < max_id, "min_id must be less than max_id"
+        if max_id is not None:
+            assert min_id < max_id, "min_id must be less than max_id"
 
-        page = 0
-        while page < limit:
-            if max_id is None:
-                resp = self._get(
-                    "/v2/search",
-                    params=dict(
-                        q=query,
-                        resolve=resolve,
-                        limit=limit,
-                        type=searchtype,
-                        offset=offset,
-                        min_id=min_id,
-                    ),
-                )
+        PAGE_SIZE = 40
+        total_yielded = 0
+        while total_yielded < limit:
+            fetch_size = min(PAGE_SIZE, limit - total_yielded)
+            params = dict(
+                q=query,
+                resolve=resolve,
+                limit=fetch_size,
+                type=searchtype,
+                offset=offset,
+                min_id=min_id,
+            )
+            if max_id is not None:
+                params["max_id"] = max_id
 
-            else:
-                resp = self._get(
-                    "/v2/search",
-                    params=dict(
-                        q=query,
-                        resolve=resolve,
-                        limit=limit,
-                        type=searchtype,
-                        offset=offset,
-                        min_id=min_id,
-                        max_id=max_id,
-                    ),
-                )
+            resp = self._get("/v2/search", params=params)
 
-            offset += 40
-            # added new not sure if helpful
             if not resp or all(value == [] for value in resp.values()):
                 break
 
             yield resp
+            total_yielded += sum(len(v) for v in resp.values() if isinstance(v, list))
+            offset += PAGE_SIZE
 
     def hashtag(
         self,

@@ -79,10 +79,12 @@ def user(handle: str):
     "--limit", default=40, help="Limit the number of items returned", type=int
 )
 @click.option("--resolve", help="Resolve", type=bool)
-def search(searchtype: str, query: str, limit: int, resolve: bool):
+@click.option("--start-date", default=None, help="Start date for search results (e.g. 2026-01-01)", type=str)
+@click.option("--end-date", default=None, help="End date for search results (e.g. 2026-03-01)", type=str)
+def search(searchtype: str, query: str, limit: int, resolve: bool, start_date: str, end_date: str):
     """Search for users, statuses, groups, or hashtags."""
 
-    for page in api.search(searchtype, query, limit, resolve):
+    for page in api.search(searchtype, query, limit, resolve, start_date=start_date, end_date=end_date):
         print(json.dumps(page[searchtype]))
 
 
