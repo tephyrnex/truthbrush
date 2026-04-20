@@ -1,14 +1,16 @@
-from time import sleep
-from typing import Any, Iterator, List, Optional, Literal
-from loguru import logger
-from dateutil import parser as date_parse
-from datetime import datetime, timezone, date
-from curl_cffi import requests
-import curl_cffi
 import json
 import logging
 import os
+from collections.abc import Iterator
+from datetime import datetime, timezone
+from time import sleep
+from typing import Any, Literal
+
+import curl_cffi
+from curl_cffi import requests
+from dateutil import parser as date_parse
 from dotenv import load_dotenv
+from loguru import logger
 
 load_dotenv()  # take environment variables from .env.
 
@@ -22,7 +24,8 @@ logging.basicConfig(
 
 BASE_URL = "https://truthsocial.com"
 API_BASE_URL = "https://truthsocial.com/api"
-USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 12_2_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
+USER_AGENT: str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
+IMPERSONATE_TARGET: str = "chrome146"
 
 # Oauth client credentials, from https://truthsocial.com/packs/js/application-d77ef3e9148ad1d0624c.js
 CLIENT_ID = "9X1Fdd-pxNsAgEDNi_SfhJWi8T-vLuV2WVzKIbkTCw4"
@@ -107,9 +110,7 @@ class Api:
         if resp.headers.get("x-ratelimit-remaining") is not None:
             self.ratelimit_remaining = int(resp.headers.get("x-ratelimit-remaining"))
         if resp.headers.get("x-ratelimit-reset") is not None:
-            self.ratelimit_reset = date_parse.parse(
-                resp.headers.get("x-ratelimit-reset")
-            )
+            self.ratelimit_reset = date_parse.parse(resp.headers.get("x-ratelimit-reset"))
 
         if (
             self.ratelimit_remaining is not None and self.ratelimit_remaining <= 50
@@ -118,9 +119,7 @@ class Api:
             time_to_sleep = (
                 self.ratelimit_reset.replace(tzinfo=timezone.utc) - now
             ).total_seconds()
-            logger.warning(
-                f"Approaching rate limit; sleeping for {time_to_sleep} seconds..."
-            )
+            logger.warning(f"Approaching rate limit; sleeping for {time_to_sleep} seconds...")
             if time_to_sleep > 0:
                 sleep(time_to_sleep)
             else:
@@ -132,7 +131,7 @@ class Api:
                 API_BASE_URL + url,
                 params=params,
                 proxies=proxies,
-                impersonate="chrome136",
+                impersonate=IMPERSONATE_TARGET,
                 headers={
                     "Authorization": "Bearer " + self.auth_id,
                     "User-Agent": USER_AGENT,
@@ -148,7 +147,13 @@ class Api:
         try:
             r = resp.json()
         except json.JSONDecodeError:
-            logger.error(f"Failed to decode JSON: {resp.text}")
+            body = resp.text
+            if "Just a moment" in body or "cdn-cgi/challenge-platform" in body:
+                raise CFBlockException(
+                    "Cloudflare challenge page received instead of JSON. "
+                    "Source IP is likely flagged; try a different network."
+                ) from None
+            logger.error(f"Failed to decode JSON: {body}")
             r = None
 
         return r
@@ -164,7 +169,7 @@ class Api:
                 next_link,
                 params=params,
                 proxies=proxies,
-                impersonate="chrome136",
+                impersonate=IMPERSONATE_TARGET,
                 headers={
                     "Authorization": "Bearer " + self.auth_id,
                     "User-Agent": USER_AGENT,
@@ -183,9 +188,7 @@ class Api:
             # Will also sleep
             self._check_ratelimit(resp)
 
-    def user_likes(
-        self, post: str, include_all: bool = False, top_num: int = 40
-    ) -> bool | Any:
+    def user_likes(self, post: str, include_all: bool = False, top_num: int = 40) -> bool | Any:
         """Return the top_num most recent (or all) users who liked the post."""
         self.__check_login()
         top_num = int(top_num)
@@ -229,7 +232,7 @@ class Api:
                     if not include_all and n_output >= top_num:
                         return
 
-    def lookup(self, user_handle: str = None) -> Optional[dict]:
+    def lookup(self, user_handle: str = None) -> dict | None:
         """Lookup a user's information."""
 
         self.__check_login()
@@ -249,7 +252,7 @@ class Api:
             str | datetime
         ) = None,  # intended use is dates i.e "2026-01-01", supports datetime
         end_date: str | datetime = None,
-    ) -> Optional[dict]:
+    ) -> dict | None:
         """Search users, statuses or hashtags."""
 
         self.__check_login()
@@ -296,7 +299,7 @@ class Api:
         self,
         tag: str = None,
         limit: int = 100,
-    ) -> Optional[dict]:
+    ) -> dict | None:
         """Collect posts with a specific hashtag."""
 
         self.__check_login()
@@ -308,9 +311,7 @@ class Api:
         num_results = 0
         params = dict()
         while num_results < limit:
-            logger.info(
-                f"Collecting posts with hashtag: {tag}, max_id: {params.get('max_id')}"
-            )
+            logger.info(f"Collecting posts with hashtag: {tag}, max_id: {params.get('max_id')}")
             resp = self._get(
                 f"/v1/timelines/tag/{tag}",
                 params=params,
@@ -340,15 +341,13 @@ class Api:
         self.__check_login()
         timeline = []
         posts = self._get(f"/v1/timelines/group/{group_id}?limit={limit}")
-        while posts != None:
+        while posts is not None:
             timeline += posts
             limit = limit - len(posts)
             if limit <= 0:
                 break
             max_id = posts[-1]["id"]
-            posts = self._get(
-                f"/v1/timelines/group/{group_id}?max_id={max_id}&limit={limit}"
-            )
+            posts = self._get(f"/v1/timelines/group/{group_id}?max_id={max_id}&limit={limit}")
         return timeline
 
     def tags(self):
@@ -434,7 +433,7 @@ class Api:
         created_after: datetime = None,
         since_id=None,
         pinned=False,
-    ) -> List[dict]:
+    ) -> list[dict]:
         """Pull the given user's statuses.
 
         Params:
@@ -464,6 +463,8 @@ class Api:
             except json.JSONDecodeError as e:
                 logger.error(f"Unable to pull user #{user_id}'s statuses': {e}")
                 break
+            except CFBlockException:
+                raise
             except Exception as e:
                 logger.error(f"Misc. error while pulling statuses for {user_id}: {e}")
                 break
@@ -499,9 +500,7 @@ class Api:
                 # only keep posts created after the specified date
                 # exclude posts created before the specified date
                 # since the page is listed in reverse chronology, we don't need any remaining posts on this page either
-                post_at = date_parse.parse(post["created_at"]).replace(
-                    tzinfo=timezone.utc
-                )
+                post_at = date_parse.parse(post["created_at"]).replace(tzinfo=timezone.utc)
                 if (created_after and post_at <= created_after) or (
                     since_id and int(post["id"]) <= int(since_id)
                 ):
@@ -532,7 +531,7 @@ class Api:
                 url,
                 json=payload,
                 proxies=proxies,
-                impersonate="chrome136",
+                impersonate=IMPERSONATE_TARGET,
                 headers={
                     "User-Agent": USER_AGENT,
                 },
@@ -560,8 +559,8 @@ class Api:
 
             sess_req.raise_for_status()
         except requests.RequestsError as e:
-            logger.error(f"Failed login request: {str(e)}")
-            raise LoginErrorException("Cannot authenticate to .")
+            logger.error(f"Failed login request: {e!s}")
+            raise LoginErrorException("Cannot authenticate to .") from e
 
         if not sess_req.json()["access_token"]:
             raise ValueError("Invalid truthsocial.com credentials provided!")

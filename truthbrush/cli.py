@@ -1,9 +1,11 @@
 """Defines the CLI for Truthbrush."""
 
-import json
-import click
-from datetime import date
 import datetime
+import json
+from datetime import date
+
+import click
+
 from .api import Api
 
 api = Api()
@@ -16,9 +18,7 @@ def cli():
 
 @cli.command()
 @click.argument("group_id")
-@click.option(
-    "--limit", default=20, help="Limit the number of items returned", type=int
-)
+@click.option("--limit", default=20, help="Limit the number of items returned", type=int)
 def groupposts(group_id: str, limit: int):
     """Pull posts from group timeline"""
 
@@ -75,16 +75,20 @@ def user(handle: str):
     help="Type of search query (accounts, statuses, groups, or hashtags)",
     type=click.Choice(["accounts", "statuses", "hashtags", "groups"]),
 )
-@click.option(
-    "--limit", default=40, help="Limit the number of items returned", type=int
-)
+@click.option("--limit", default=40, help="Limit the number of items returned", type=int)
 @click.option("--resolve", help="Resolve", type=bool)
-@click.option("--start-date", default=None, help="Start date for search results (e.g. 2026-01-01)", type=str)
-@click.option("--end-date", default=None, help="End date for search results (e.g. 2026-03-01)", type=str)
+@click.option(
+    "--start-date", default=None, help="Start date for search results (e.g. 2026-01-01)", type=str
+)
+@click.option(
+    "--end-date", default=None, help="End date for search results (e.g. 2026-03-01)", type=str
+)
 def search(searchtype: str, query: str, limit: int, resolve: bool, start_date: str, end_date: str):
     """Search for users, statuses, groups, or hashtags."""
 
-    for page in api.search(searchtype, query, limit, resolve, start_date=start_date, end_date=end_date):
+    for page in api.search(
+        searchtype, query, limit, resolve, start_date=start_date, end_date=end_date
+    ):
         print(json.dumps(page[searchtype]))
 
 
@@ -147,9 +151,7 @@ def ads():
     help="Only pull posts created on or after the specified datetime, e.g. 2021-10-02 or 2011-11-04T00:05:23+04:00 (defaults to none). If a timezone is not specified, UTC is assumed.",
     type=datetime.datetime.fromisoformat,
 )
-@click.option(
-    "--pinned/--all", default=False, help="Only pull pinned posts (defaults to all)"
-)
+@click.option("--pinned/--all", default=False, help="Only pull pinned posts (defaults to all)")
 def statuses(
     username: str,
     replies: bool = False,
@@ -180,12 +182,8 @@ def likes(post: str, includeall: bool, top_num: int):
 
 @cli.command()
 @click.argument("post")
-@click.option(
-    "--includeall", is_flag=True, help="return all comments on post. Overrides top_num."
-)
-@click.option(
-    "--onlyfirst", is_flag=True, help="return only direct replies to specified post"
-)
+@click.option("--includeall", is_flag=True, help="return all comments on post. Overrides top_num.")
+@click.option("--onlyfirst", is_flag=True, help="return only direct replies to specified post")
 @click.argument("top_num")
 def comments(post: str, includeall: bool, onlyfirst: bool, top_num: int = 40):
     """Pull the top_num comments on a post (defaults to all users, including replies)."""

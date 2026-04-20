@@ -11,18 +11,29 @@ truthbrush = "truthbrush.cli:cli"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-click = "^8.1.0"
-loguru = "^0.7.0"
-python-dotenv = "^1.0.1"
+click = "^8.3.0"
+loguru = "^0.7.3"
+python-dotenv = "^1.2.0"
 
 python-dateutil = "^2.9.0"
-curl_cffi = "^0.14.0"
+curl_cffi = "^0.15.0"
 
 [tool.poetry.group.dev.dependencies]
-black = "^26.1.0"
-pytest = "^9.0.1"
-pylint = "^4.0.2"
+pytest = "^9.0.3"
+ruff = "^0.15.0"
+ty = ">=0.0.31,<1.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.ty.rules]
+unresolved-import = "warn"
