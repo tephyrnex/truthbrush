@@ -140,6 +140,7 @@ class Api:
             )
         except curl_cffi.curl.CurlError as e:
             logger.error(f"Curl error: {e}")
+            return None
 
         # Will also sleep
         self._check_ratelimit(resp)
